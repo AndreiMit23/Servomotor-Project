@@ -39,13 +39,13 @@ void initPLL(void)
     };
 }
  
-void initPWM(void)
+void initPWM1(void)
 {
     // 20/25 * 10^6 = 800.000 / 64 = 12.500
-    P1TPER = 12500; // Perioada generator PWM1
+    P1TPER = 12500; // Perioada generator PWM1 perioada 20 ms
     P2TPER = 12500; // Perioada generator PWM2
     
-    // 1/25 * 10^6 * 2 = 80.000 / 64 = 1250
+    // 1/25 * 10^6 * 2 = 80.000 / 64 = 1250 
 	P1DC2 = 1250;
  
     PTCONbits.PTCKPS = 0b11; // Prescale de 1:64
@@ -96,18 +96,88 @@ void __attribute__((interrupt, no_auto_psv)) _ADC1Interrupt(void)
 	_AD1IF = 0; // Achita intreruperea convertorului AD
 }
  
+//cerinta 5 - toggle pe pinul 5 
+void __attribute__((interrupt, no_auto_psv)) _T5Interrupt(void)
+{
+    _RB5 = ~_RB5; 
+    _RB13 = _RB5;
+
+    _T5IF = 0;
+}
+
+//pentru 1 s nu putem folosi direct timer 1 =>dupa calcule si 
+//impartire la prescaler: 156250 > 65535 , avem nevoie de 2 timere concatenate 
+//si putem lucra fara prescaler doar cu modulul PLL
+void initTmrConcatenate()
+{
+    T4CON = 0;
+    T4CONbits.TCKPS = 0b00; // fara prescaler lucrez 
+    
+    TMR4 = 0;
+    TMR5 = 0;
+
+    PR4 = 0x5A00;
+    PR5 = 0x262;
+
+    T4CONbits.T32 = 1;
+    
+    T4CONbits.TON = 1;
+//T5 devine partea HIGH pe care o vom folosi la intrerupere 
+    _T5IF = 0; 
+    _T5IE = 1;
+}
+
+//cerinta 4 - comutare cand apas butonul S2 
+int directie = 1;
+void updatePWM()
+{
+    if(directie == 1){
+        P1DC2 += 250;  // 0.2ms latimea impulsului
+
+        if(P1DC2 >= 2750) // adica 2.2ms STOP daca s a atins valoarea 
+        {
+            directie = 0; 
+        }
+    }else{
+        P1DC2 -= 250;
+
+        if(P1DC2 <= 250)
+            directie = 1;
+    }
+}
+
+//intreruperea este legata de pinul RB7 practic cand apas S2 intra in intrerupere
+//mai departe merge in updatePWM();
+void __attribute__((interrupt,no_auto_psv)) _INT0Interrupt(void)
+{
+    updatePWM();
+
+    _INT0IF = 0;
+}
+
 int main(void)
 {	
 	initPLL();
 	initAdc1();
 	initTmr3();	
-	initPWM();
+	initPWM1();
+    initTmrConcatenate();
  
 	_TRISB12 = 0; // ca iesire 
 	_TRISB14 = 0;
+    
+    //cerinta 5
+    _TRISB5 = 0;
+    _TRISB13 = 0;
+    _TRISB7 = 1; //# INTRARE BABY 
  
- 
+
+    //cerinta 4
+    _INT0IF = 0; //pentru mine: Sterge flagul intreruperii
+    _INT0IE = 1; //permitere intrerupere
+    _INT0EP = 1; //polaritatea : setat pe 1 deoarece cand apas butonul S2 practic el e activ pe 0
+    // gen intreruperea asta se genereaza pe front descrescator (1 -> 0) . si se leaga cu S2 (SPER SA INTELEGI :(()))   
 	while(1){
- 
+  
 	}
 }
