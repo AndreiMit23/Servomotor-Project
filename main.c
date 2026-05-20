@@ -5,17 +5,12 @@ _FOSCSEL(FNOSC_FRC);
 // Enable Clock Switching and Configure
 _FOSC(FCKSM_CSECMD & OSCIOFNC_OFF);
  
-double getPulseWidthValue(double buff)
+unsigned int getPulseWidthValue(double buff)
 {
     // calculez latimea pulsului in ms normalizata in intervalul 1-2ms.
-    double value = (buff / 4095 + 1);
-    // calculez valoarea ce trebuie introdusa in registrul P1DC1.
-    // (value / 25) * 10^6 / 64(prescaler)
-    unsigned int registerValue = (int)(value / 25 * 2000000) / 64;
-#ifdef DEBUG
-    printf("Value: %f | \t registerValue: %d (%b)\n", value, registerValue, registerValue);
-#endif
-    return registerValue;
+    unsigned int value = 1250 * (buff / 4095 + 1);
+    
+    return value;
 }
  
 void initPLL(void)
